@@ -1,0 +1,31 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: DRC Legal NER
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Bernard
+    name-particle: Tshabu
+    family-names: Ngandu
+    email: bernard@devscast.tech
+    affiliation: Devscast Community
+    orcid: 'https://orcid.org/0009-0003-9777-6349'
+repository-code: 'https://github.com/bernard-ng/drc-legal-ner'
+repository: >-
+  https://github.com/bernard-ng/drc-legal-ner
+abstract: >-
+  This Named Entity Recognition (NER) model is tailored to automate the extraction of critical legal entities from Congolese legislative and regulatory documents.
+  Focused on identifying three core categories—Document Type, Reference Number, and Publication Date—the model streamlines the parsing of legal texts for enhanced accessibility and analysis.
+keywords:
+  - legal
+  - datasets
+  - DRC
+  - NLP
+license: CC-BY-NC-SA-4.0
+commit: 2f288ac1b6e59b4352c9718bffd9410f2bc93fc3
+version: 1.0.0
+date-released: '2025-02-11'
