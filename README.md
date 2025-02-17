@@ -73,13 +73,40 @@ Looking ahead, integrating **multiple-reference document handling** and **real-t
 
 Ultimately, this work lays the foundation for a **more structured, accessible, and efficient legal information system**, empowering legal professionals, researchers, and policymakers in the DRC.
 
-**Usage**
+# Usage
 ```bash
 git clone https://github.com/bernard-ng/drc-legal-ner.git
 cd drc-legal-ner
-```
-```bash
+
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+1. **Annotation**
+
+   Will generate a dataset of Congolese legal texts and annotate it using GPT-3.5-turbo
+   you can do it synchronously or asynchronously (with batch API).
+   
+   ```bash
+   python -m processing.batch.requests
+   python -m processing.batch.response  # 24h later
+   
+   python -m process.annotate --method=async
+   ```
+
+2. **Training**
+
+   Will generate a model based on the annotated dataset and save it in the `models` directory
+   
+   ```bash
+   python train.py
+   ```
+
+3. **Testing**
+
+   Will lunch a web app based on streamlit on http://localhost:8501
+   
+   ```bash
+   python app.py
+   ```

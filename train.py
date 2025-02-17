@@ -1,11 +1,9 @@
-from datetime import datetime
 import random
 import spacy
 from spacy.tokens import DocBin
 from spacy.training.example import Example
-from tqdm import tqdm
-from processing.utils import load_training_data
 
+from misc import TRAINING_EPOCHS, MODEL_NAME, load_json_dataset
 
 # Initialize blank French NLP model
 nlp = spacy.blank("fr")
@@ -17,26 +15,36 @@ else:
     ner = nlp.get_pipe("ner")
 
 # Dataset and model paths
-EPOCHS = 5
-MODEL = f"./models/leganews-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-DATA = load_training_data('./dataset/train.json')
-random.shuffle(DATA)
+DATASET = load_json_dataset('train.json')
+random.shuffle(DATASET)
 
-split_index = int(0.8 * len(DATA))
-TRAIN_SET = DATA[:split_index]
+SPLIT_INDEX = int(0.8 * len(DATASET))
+TRAIN_SET = DATASET[:SPLIT_INDEX]
+EVAL_SET = DATASET[SPLIT_INDEX:]
+
 print(f"Training set size: {len(TRAIN_SET)}")
+print(f"Evaluation set size: {len(EVAL_SET)}")
+
+def align_entities(text, entities):
+    """Adjust entity offsets to match SpaCy's tokenization."""
+    doc = nlp.make_doc(text)
+    new_entities = []
+    for start, end, label in entities:
+        entity_text = text[start:end]
+        for token in doc:
+            if entity_text == token.text:
+                new_entities.append((token.idx, token.idx + len(token.text), label))
+                break
+    return new_entities
 
 
 def training():
-    """Train a named entity recognition (NER) model with spaCy"""
-    # Add entity labels from training data
     for _, annotations in TRAIN_SET:
         for ent in annotations["entities"]:
             ner.add_label(ent[2])  # ent[2] is the entity label
 
     # Prepare training examples
     db = DocBin()
-    used = 0
     for text, annotations in TRAIN_SET:
         try:
             doc = nlp.make_doc(text)
@@ -47,35 +55,65 @@ def training():
                     ents.append(span)
             doc.ents = ents
             db.add(doc)
-            used += 1
         except Exception as e:
-            print(f"Skipping example due to error: {e}")
             continue
-
-    print(f"Used {used} out of {len(TRAIN_SET)} examples")
+    print(f"Used {len(db)} out of {len(TRAIN_SET)} examples")
 
     # Initialize the model
     optimizer = nlp.initialize()
 
     # Training loop
-    for epoch in tqdm(range(EPOCHS), desc="Epochs"):
+    for epoch in range(TRAINING_EPOCHS):
         losses = {}
         random.shuffle(TRAIN_SET)  # Shuffle at each epoch
+
         for text, annotations in TRAIN_SET:
             try:
+                # Update annotations with aligned entities
+                annotations["entities"] = align_entities(text, annotations["entities"])
+
                 doc = nlp.make_doc(text)
                 example = Example.from_dict(doc, annotations)
                 nlp.update([example], drop=0.3, losses=losses)
-            except Exception as e:
-                print(f"Skipping training example due to error: {e}")
+            except Exception:
                 continue
 
         print(f"Epoch {epoch+1} Loss: {losses}")
 
-    # Save the trained model
-    nlp.to_disk(MODEL)
-    print(f"Model saved to {MODEL}")
+    nlp.to_disk(MODEL_NAME)
+    print(f"Model saved to {MODEL_NAME}")
+
+
+def evaluation():
+    nlp = spacy.load(MODEL_NAME)
+    examples = []
+
+    for text, annotations in EVAL_SET:
+        try:
+            # Update annotations with aligned entities
+            annotations["entities"] = align_entities(text, annotations["entities"])
+
+            doc = nlp(text)  # Process the text with the pipeline
+            example = Example.from_dict(doc, annotations)  # Create an Example
+            examples.append(example)
+        except Exception:
+            continue
+    print(f"Used {len(examples)} out of {len(EVAL_SET)} examples")
+
+    # Evaluate the model
+    scores = nlp.evaluate(examples)
+
+    print("\n🔍 Evaluation Metrics:")
+    print(f"Precision: {scores['ents_p']:.3f}")
+    print(f"Recall: {scores['ents_r']:.3f}")
+    print(f"F1-score: {scores['ents_f']:.3f}")
+
+    if "ents_per_type" in scores:
+        print("\n📌 Per-Entity Scores:")
+        for entity, metrics in scores["ents_per_type"].items():
+            print(f" - {entity}: Precision={metrics['p']:.3f}, Recall={metrics['r']:.3f}, F1={metrics['f']:.3f}")
 
 
 if __name__ == "__main__":
     training()
+    evaluation()

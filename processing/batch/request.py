@@ -1,16 +1,14 @@
 import json
-from processing.utils import load_dataset
 from tqdm import tqdm
 import os
 from openai import OpenAI
 
+from misc import load_csv_dataset, load_prompt, BATCH_REQUESTS_SIZE, DATA_DIR, BATCH_DATA_DIR, \
+    UPLOADED_REQUESTS_LOGS_PATH, CREATED_BATCHES_LOGS_PATH, BATCH_REQUESTS_PATH
+
 client = OpenAI()
-BATCH_SIZE = 10
-
-data = load_dataset('../../dataset/data.csv')
-with open('../prompt.txt', 'r') as f:
-    prompt = f.read()
-
+data = load_csv_dataset('data.csv')
+prompt = load_prompt()
 
 def build_request(identifier: int, title: str) -> str:
     request = {
@@ -30,62 +28,53 @@ def build_request(identifier: int, title: str) -> str:
     return json.dumps(request, ensure_ascii=False, separators=(',', ':'))
 
 
-def save_requests(r: list, path: str) -> None:
-    for i in range(0, len(r), BATCH_SIZE):
-        with open(f"{path[:-6]}-{i}.jsonl", "w", encoding="utf-8") as f:
-            f.write('\n'.join(r[i:i+BATCH_SIZE]))
-
-
-def build_requests_jsonl(path: str) -> None:
+def build_jsonl_requests() -> None:
     requests = []
     for i, row in enumerate(data):
         requests.append(build_request(i, row['title']))
 
-    save_requests(requests, path)
+    for i in tqdm(range(0, len(requests), BATCH_REQUESTS_SIZE), desc="Creating JSONL request files"):
+        request_file = os.path.join(BATCH_DATA_DIR, f"requests/request-{i}.jsonl")
+
+        with open(request_file, "w", encoding="utf-8") as f:
+            f.write('\n'.join(requests[i:i + BATCH_REQUESTS_SIZE]))
 
 
-def create_batches() -> None:
-    with open("dataset/logs/last-uploaded-files.csv", "r") as f:
+def create_batch_jobs() -> None:
+    with open(UPLOADED_REQUESTS_LOGS_PATH, "r") as f:
         ids = f.readlines()[1:]
 
     responses = []
-    for file in tqdm(ids, desc="Creating Batches"):
-        file_id = file.strip()
+    for file_id in tqdm(ids, desc="Creating Batches for uploaded requests"):
         response = client.batches.create(
-            input_file_id=file_id,
+            input_file_id=file_id.strip(),
             endpoint="/v1/chat/completions",
             completion_window="24h"
         )
         responses.append(response)
 
-    print(">> Batch Created !")
-    with open("dataset/logs/last-created-batches.csv", "w") as f:
+    with open(CREATED_BATCHES_LOGS_PATH, "w") as f:
         f.write("batch_id\n")
-        for response in tqdm(responses, desc="Saving Batch IDs"):
-            f.write(f"{response.id}\n")
+        for batch in tqdm(responses, desc="Saving Batch IDs"):
+            f.write(f"{batch.id}\n")
 
 
-def delete_last_uploaded_files() -> None:
-    with open("dataset/logs/last-uploaded-files.csv", "r") as f:
-        ids = f.readlines()[1:]
-        for file_id in tqdm(ids, desc="Deleting Files"):
-            client.files.delete(file_id.strip())
-
-
-def upload_files() -> None:
+def upload_jsonl_requests() -> None:
     responses = []
-    for file in tqdm(os.listdir("dataset/requests"), desc="Uploading Files"):
+
+    for file in tqdm(os.listdir(BATCH_REQUESTS_PATH), desc="Uploading JSONL request files"):
         if file.endswith(".jsonl"):
-            response = client.files.create(file=open(f"dataset/requests/{file}", "rb"), purpose="batch")
+            batch_request_file = open(os.path.join(BATCH_REQUESTS_PATH, file), "rb")
+            response = client.files.create(file=batch_request_file, purpose="batch")
             responses.append(response)
 
-    with open("dataset/logs/last-uploaded-files.csv", "w") as f:
+    with open(UPLOADED_REQUESTS_LOGS_PATH, "w") as f:
         f.write("file_id\n")
-        for response in tqdm(responses, desc="Saving File IDs"):
-            f.write(f"{response.id}\n")
+        for file in tqdm(responses, desc="Saving File IDs"):
+            f.write(f"{file.id}\n")
 
 
 if __name__ == '__main__':
-    build_requests_jsonl('/dataset/requests/requests.jsonl')
-    upload_files()
-    create_batches()
+    build_jsonl_requests()
+    upload_jsonl_requests()
+    create_batch_jobs()
