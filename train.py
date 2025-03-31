@@ -18,7 +18,7 @@ else:
 DATASET = load_json_dataset('train.json')
 random.shuffle(DATASET)
 
-SPLIT_INDEX = int(0.8 * len(DATASET))
+SPLIT_INDEX = int(0.9 * len(DATASET))
 TRAIN_SET = DATASET[:SPLIT_INDEX]
 EVAL_SET = DATASET[SPLIT_INDEX:]
 
