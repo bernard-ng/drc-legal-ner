@@ -1,19 +1,69 @@
 import os
+import uuid
 
-from misc import clean_spacing, DATA_DIR, ROOT_DIR
+from tqdm import tqdm
+
+from misc import clean_spacing, DATA_DIR
+from misc import load_json_dataset, save_json_dataset
+
+
+def convert_label_studio_to_spacy(label_studio_data):
+    text = label_studio_data.get("data", {}).get("text", "")
+    results = label_studio_data.get("predictions", [{}])[0].get("result", [])
+
+    entities = [
+        (res["value"]["start"], res["value"]["end"], label)
+        for res in results
+        for label in res["value"].get("labels", [])
+    ]
+
+    return [text, {"entities": entities}]
+
+
+def convert_to_label_studio_format(data):
+    text, annotations = data
+    entities = annotations.get("entities", [])
+
+    converted = {
+        "data": {"text": text},
+        "predictions": [
+            {
+                "model_version": "one",
+                "score": 1.0,
+                "result": [
+                    {
+                        "id": str(uuid.uuid4())[:8],
+                        "from_name": "label",
+                        "to_name": "text",
+                        "type": "labels",
+                        "value": {
+                            "start": start,
+                            "end": end,
+                            "score": 1.0,
+                            "text": text[start:end],
+                            "labels": [label]
+                        }
+                    }
+                    for start, end, label in entities
+                ]
+            }
+        ]
+    }
+    return converted
+
 
 if __name__ == "__main__":
-    print("Cleaning data files...")
-    with open(os.path.join(DATA_DIR, 'data.csv'), 'w') as f:
-        f.write(clean_spacing('data.csv'))
+    files = ['data.csv', 'pre-annotated.json', 'llm-annotated.json', 'prompt.txt'];
+    for file_name in tqdm(files, desc="cleaning files"):
+        file_path = os.path.join(DATA_DIR, file_name)
+        cleaned_content = clean_spacing(file_name)
 
-    with open(os.path.join(DATA_DIR, 'pre-annotated.json'), 'w') as f:
-        f.write(clean_spacing('pre-annotated.json'))
+        if cleaned_content:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(cleaned_content)
 
-    with open(os.path.join(DATA_DIR, 'prompt.txt'), 'w') as f:
-        f.write(clean_spacing('prompt.txt'))
+    data = []
+    for annotation in load_json_dataset('llm-annotated.json'):
+        data.append(convert_to_label_studio_format(annotation))
 
-    with open(os.path.join(DATA_DIR, 'train.json'), 'w') as f:
-        f.write(clean_spacing('train.json'))
-
-    print("Data files cleaned")
+    save_json_dataset(data, 'pre-annotated.json')

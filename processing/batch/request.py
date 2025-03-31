@@ -1,27 +1,46 @@
+import argparse
 import json
-from tqdm import tqdm
 import os
-from openai import OpenAI
 
-from misc import load_csv_dataset, load_prompt, BATCH_REQUESTS_SIZE, DATA_DIR, BATCH_DATA_DIR, \
-    UPLOADED_REQUESTS_LOGS_PATH, CREATED_BATCHES_LOGS_PATH, BATCH_REQUESTS_PATH
+from openai import OpenAI
+from openai.lib._pydantic import \
+    to_strict_json_schema  # https://community.openai.com/t/structured-outputs-with-batch-processing/911076/10
+from tqdm import tqdm
+
+from misc import load_csv_dataset, load_prompt, BATCH_REQUESTS_SIZE, BATCH_DATA_DIR, \
+    UPLOADED_REQUESTS_LOGS_PATH, CREATED_BATCHES_LOGS_PATH, BATCH_REQUESTS_PATH, OPENAI_MODEL
+from misc.model import LegalReference
 
 client = OpenAI()
 data = load_csv_dataset('data.csv')
 prompt = load_prompt()
 
+
 def build_request(identifier: int, title: str) -> str:
+    if OPENAI_MODEL == 'gpt-3.5-turbo':
+        schema = {"type": "json_object"}
+    else:
+        schema = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": 'LegalReference',
+                "schema": to_strict_json_schema(LegalReference),
+                "strict": True
+            }
+        }
+
+
     request = {
         "custom_id": f"{identifier}",
         "method": "POST",
         "url": "/v1/chat/completions",
         "body": {
-            "model": "gpt-3.5-turbo",
+            "model": OPENAI_MODEL,
             "messages": [
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": title}
             ],
-            "response_format": {"type": "json_object"}
+            "response_format": schema
         }
     }
 
@@ -75,6 +94,16 @@ def upload_jsonl_requests() -> None:
 
 
 if __name__ == '__main__':
-    build_jsonl_requests()
-    upload_jsonl_requests()
-    create_batch_jobs()
+    parser = argparse.ArgumentParser(description="Script to conditionally run functions.")
+    parser.add_argument("--build", action="store_true", help="Run build_jsonl_requests()")
+    parser.add_argument("--upload", action="store_true", help="Run upload_jsonl_requests()")
+    parser.add_argument("--batch", action="store_true", help="Run create_batch_jobs()")
+
+    args = parser.parse_args()
+
+    if args.build:
+        build_jsonl_requests()
+    if args.upload:
+        upload_jsonl_requests()
+    if args.batch:
+        create_batch_jobs()

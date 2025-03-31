@@ -1,0 +1,22 @@
+services:
+  neo4j:
+    image: neo4j:latest
+    container_name: neo4j
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_server_memory_pagecache_size=3G
+      - NEO4J_server_memory_heap_initial__size=3G
+      - NEO4J_server_memory_heap_max__size=3G
+      - NEO4J_dbms_memory_transaction_total_max=3G
+      - NEO4J_PLUGINS=["apoc", "graph-data-science"]
+    ports:
+      - "7474:7474"  # Neo4j Browser
+      - "7687:7687"  # Bolt protocol
+    volumes:
+      - ./var/neo4j/data:/data
+      - ./var/neo4j/logs:/logs
+      - ./var/neo4j/conf:/conf
+      - ./var/neo4j/plugins:/plugins
+volumes:
+  neo4j_data:

@@ -9,5 +9,6 @@ if __name__ == "__main__":
     for file in tqdm(response, desc="Deleting Files"):
         try:
             client.files.delete(file.id)
-        except:
+        except Exception as e:
+            print(f'Error : {e}')
             continue

@@ -15,7 +15,7 @@ else:
     ner = nlp.get_pipe("ner")
 
 # Dataset and model paths
-DATASET = load_json_dataset('train.json')
+DATASET = load_json_dataset('llm-annotated.json')
 random.shuffle(DATASET)
 
 SPLIT_INDEX = int(0.9 * len(DATASET))

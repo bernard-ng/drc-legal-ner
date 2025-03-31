@@ -2,6 +2,7 @@ import csv
 import json
 import os
 from datetime import datetime
+from typing import Optional
 
 # Paths
 ROOT_DIR = os.getcwd()
@@ -14,7 +15,7 @@ UPLOADED_REQUESTS_LOGS_PATH = os.path.join(BATCH_DATA_DIR, 'logs/uploaded-reques
 CREATED_BATCHES_LOGS_PATH = os.path.join(BATCH_DATA_DIR, 'logs/created-batches.csv')
 
 # LLM
-OPENAI_MODEL = "gpt-3.5-turbo"
+OPENAI_MODEL = "gpt-4o-mini"
 
 # Training
 TRAINING_EPOCHS = 20
@@ -22,18 +23,13 @@ BATCH_REQUESTS_SIZE = 5
 MODEL_NAME = f"./models/leganews-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
 
-def clean_spacing(filename: str) -> str:
+def clean_spacing(filename: str) -> Optional[str]:
     try:
-        with open(os.path.join(DATA_DIR, filename), 'r') as f:
+        with open(os.path.join(DATA_DIR, filename), 'r', encoding='utf8') as f:
             content = f.read()
-            content = content.replace('\00', ' ')
-            content = content.replace(' ', ' ')
-            content = content.replace('\xa0', ' ')
-
-            return content
+            return content.translate(str.maketrans({'\00': ' ', ' ': ' '}))
     except Exception as e:
-        print(f"Error reading file: {e}")
-        exit(1)
+        return None
 
 
 def load_json_dataset(path: str) -> list:
@@ -62,9 +58,11 @@ def load_csv_dataset(path: str, limit: int = None) -> list:
 
     return data
 
+
 def load_prompt() -> str:
     with open(os.path.join(DATA_DIR, 'prompt.txt'), 'r') as f:
         return f.read()
+
 
 def save_json_dataset(data: list, path: str) -> None:
     print(f">> Saving JSON dataset to {path}")
