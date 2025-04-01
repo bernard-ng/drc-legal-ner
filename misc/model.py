@@ -12,9 +12,9 @@ class LegalReferenceEntity(StrEnum):
 
 class LegalReference(BaseModel):
     title: str
-    types: Optional[List[str]] = []
-    references: Optional[List[str]] = []
-    dates: Optional[List[str]] = []
+    types: Optional[List[str]] = None
+    references: Optional[List[str]] = None
+    dates: Optional[List[str]] = None
 
     def get_span(self, entity: LegalReferenceEntity) -> Optional[List[tuple]]:
         values = getattr(self, entity.value)

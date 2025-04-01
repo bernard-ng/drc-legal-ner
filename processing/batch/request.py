@@ -59,6 +59,41 @@ def build_jsonl_requests() -> None:
             f.write('\n'.join(requests[i:i + BATCH_REQUESTS_SIZE]))
 
 
+def cancel_all_batches():
+    try:
+        limit, after, cancelled_count = 100, None, 0
+        while True:
+            batches = client.batches.list(limit=limit, after=after)
+            if not batches.data:
+                print("No active batch jobs found.")
+                break
+
+            for batch in batches.data:
+                batch_id = batch.id
+                status = batch.status
+
+                if status in ["in_progress", "queued"]:  # Cancel only running/queued jobs
+                    print(f"Cancelling batch job: {batch_id} (Status: {status})")
+                    client.batches.cancel(batch_id)
+                    cancelled_count += 1
+                else:
+                    print(f"Skipping batch {batch_id} (Status: {status})")
+
+            if batches.has_next_page():
+                next_page_info = batches.next_page_info()
+                if next_page_info:
+                    after = next_page_info.params.get("after")
+                else:
+                    break
+            else:
+                break
+
+        print(f"Total {cancelled_count} running or queued batch jobs have been cancelled.")
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+
 def create_batch_jobs() -> None:
     with open(UPLOADED_REQUESTS_LOGS_PATH, "r") as f:
         ids = f.readlines()[1:]
@@ -98,6 +133,7 @@ if __name__ == '__main__':
     parser.add_argument("--build", action="store_true", help="Run build_jsonl_requests()")
     parser.add_argument("--upload", action="store_true", help="Run upload_jsonl_requests()")
     parser.add_argument("--batch", action="store_true", help="Run create_batch_jobs()")
+    parser.add_argument('--cancel', action='store_true', help='Cancel all running batch jobs')
 
     args = parser.parse_args()
 
@@ -107,3 +143,5 @@ if __name__ == '__main__':
         upload_jsonl_requests()
     if args.batch:
         create_batch_jobs()
+    if args.cancel:
+        cancel_all_batches()
