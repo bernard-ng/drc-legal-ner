@@ -29,7 +29,6 @@ def build_request(identifier: int, title: str) -> str:
             }
         }
 
-
     request = {
         "custom_id": f"{identifier}",
         "method": "POST",
@@ -59,7 +58,7 @@ def build_jsonl_requests() -> None:
             f.write('\n'.join(requests[i:i + BATCH_REQUESTS_SIZE]))
 
 
-def cancel_all_batches():
+def cancel_batches():
     try:
         limit, after, cancelled_count = 100, None, 0
         while True:
@@ -94,7 +93,7 @@ def cancel_all_batches():
         print(f"Error: {e}")
 
 
-def create_batch_jobs() -> None:
+def create_batches() -> None:
     with open(UPLOADED_REQUESTS_LOGS_PATH, "r") as f:
         ids = f.readlines()[1:]
 
@@ -111,6 +110,40 @@ def create_batch_jobs() -> None:
         f.write("batch_id\n")
         for batch in tqdm(responses, desc="Saving Batch IDs"):
             f.write(f"{batch.id}\n")
+
+
+def retry_batches():
+    with open(CREATED_BATCHES_LOGS_PATH, "r") as f:
+        ids = f.readlines()[1:]
+
+    failed_batches_ids = []
+    retried_batches_ids = []
+
+    for batch_id in tqdm(ids, desc="Retrying failed batches"):
+        batch = client.batches.retrieve(batch_id.strip())
+
+        if batch.status == "failed" and batch.input_file_id:
+            retried_batch = client.batches.create(
+                input_file_id=batch.input_file_id.strip(),
+                endpoint="/v1/chat/completions",
+                completion_window="24h"
+            )
+
+            if retried_batch:
+                failed_batches_ids.append(batch.id)
+                retried_batches_ids.append(retried_batch.id)
+
+    if failed_batches_ids:
+        with open(CREATED_BATCHES_LOGS_PATH, "r") as f:
+            lines = f.readlines()
+
+        with open(CREATED_BATCHES_LOGS_PATH, "w") as f:
+            for line in lines:
+                batch_id = line.strip()
+                if batch_id in failed_batches_ids:
+                    f.write(f"{retried_batches_ids[failed_batches_ids.index(batch_id)]}\n")
+                else:
+                    f.write(line)
 
 
 def upload_jsonl_requests() -> None:
@@ -130,10 +163,11 @@ def upload_jsonl_requests() -> None:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Script to conditionally run functions.")
-    parser.add_argument("--build", action="store_true", help="Run build_jsonl_requests()")
-    parser.add_argument("--upload", action="store_true", help="Run upload_jsonl_requests()")
-    parser.add_argument("--batch", action="store_true", help="Run create_batch_jobs()")
+    parser.add_argument("--build", action="store_true", help="Create JSONL requests")
+    parser.add_argument("--upload", action="store_true", help="Upload JSONL requests")
+    parser.add_argument("--create", action="store_true", help="Create batch jobs")
     parser.add_argument('--cancel', action='store_true', help='Cancel all running batch jobs')
+    parser.add_argument('--retry', action='store_true', help='Retry all failed batch jobs')
 
     args = parser.parse_args()
 
@@ -141,7 +175,9 @@ if __name__ == '__main__':
         build_jsonl_requests()
     if args.upload:
         upload_jsonl_requests()
-    if args.batch:
-        create_batch_jobs()
+    if args.create:
+        create_batches()
     if args.cancel:
-        cancel_all_batches()
+        cancel_batches()
+    if args.retry:
+        retry_batches()

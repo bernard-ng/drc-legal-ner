@@ -1,7 +1,7 @@
-from tqdm import tqdm
 from openai import OpenAI
 
 client = OpenAI()
+
 
 def delete_all_files():
     try:
@@ -38,4 +38,8 @@ def delete_all_files():
 
 
 if __name__ == "__main__":
-    delete_all_files()
+    confirmation = input("Are you sure you want to delete all files? (yes/no): ")
+    if confirmation.lower() == "yes":
+        delete_all_files()
+    else:
+        print("Operation cancelled.")

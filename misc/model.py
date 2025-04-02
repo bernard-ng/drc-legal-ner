@@ -5,9 +5,9 @@ from pydantic import BaseModel
 
 
 class LegalReferenceEntity(StrEnum):
-    TYPE = 'type'
-    REFERENCE = 'reference'
-    DATE = 'date'
+    TYPE = 'types'
+    REFERENCE = 'references'
+    DATE = 'dates'
 
 
 class LegalReference(BaseModel):
@@ -25,7 +25,7 @@ class LegalReference(BaseModel):
         for value in values:
             if value in self.title:
                 start = self.title.index(value)
-                spans.append((start, start + len(value), entity.value.upper()))
+                spans.append((start, start + len(value), entity.value.strip('s').upper()))
 
         return spans if spans else None
 

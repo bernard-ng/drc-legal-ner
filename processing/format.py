@@ -1,3 +1,4 @@
+import argparse
 import os
 import uuid
 
@@ -53,17 +54,24 @@ def convert_to_label_studio_format(data):
 
 
 if __name__ == "__main__":
-    files = ['data.csv', 'pre-annotated.json', 'llm-annotated.json', 'prompt.txt'];
-    for file_name in tqdm(files, desc="cleaning files"):
-        file_path = os.path.join(DATA_DIR, file_name)
-        cleaned_content = clean_spacing(file_name)
+    parser = argparse.ArgumentParser(description="Script to conditionally run functions.")
+    parser.add_argument("--space", action="store_true", help="Clean spacing in files")
+    parser.add_argument("--label-studio", action="store_true", help="Convert to Label Studio format")
+    args = parser.parse_args()
 
-        if cleaned_content:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(cleaned_content)
+    if args.space:
+        files = ['data.csv', 'pre-annotated.json', 'llm-annotated.json', 'prompt.txt'];
+        for file_name in tqdm(files, desc="cleaning files"):
+            file_path = os.path.join(DATA_DIR, file_name)
+            cleaned_content = clean_spacing(file_name)
 
-    data = []
-    for annotation in load_json_dataset('llm-annotated.json'):
-        data.append(convert_to_label_studio_format(annotation))
+            if cleaned_content:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(cleaned_content)
 
-    save_json_dataset(data, 'pre-annotated.json')
+    if args.label_studio:
+        data = []
+        for annotation in load_json_dataset('llm-annotated.json'):
+            data.append(convert_to_label_studio_format(annotation))
+
+        save_json_dataset(data, 'pre-annotated.json')
