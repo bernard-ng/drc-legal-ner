@@ -25,18 +25,6 @@ EVAL_SET = DATASET[SPLIT_INDEX:]
 print(f"Training set size: {len(TRAIN_SET)}")
 print(f"Evaluation set size: {len(EVAL_SET)}")
 
-def align_entities(text, entities):
-    """Adjust entity offsets to match SpaCy's tokenization."""
-    doc = nlp.make_doc(text)
-    new_entities = []
-    for start, end, label in entities:
-        entity_text = text[start:end]
-        for token in doc:
-            if entity_text == token.text:
-                new_entities.append((token.idx, token.idx + len(token.text), label))
-                break
-    return new_entities
-
 
 def training():
     for _, annotations in TRAIN_SET:
@@ -69,9 +57,6 @@ def training():
 
         for text, annotations in TRAIN_SET:
             try:
-                # Update annotations with aligned entities
-                annotations["entities"] = align_entities(text, annotations["entities"])
-
                 doc = nlp.make_doc(text)
                 example = Example.from_dict(doc, annotations)
                 nlp.update([example], drop=0.3, losses=losses)
@@ -90,9 +75,6 @@ def evaluation():
 
     for text, annotations in EVAL_SET:
         try:
-            # Update annotations with aligned entities
-            annotations["entities"] = align_entities(text, annotations["entities"])
-
             doc = nlp(text)  # Process the text with the pipeline
             example = Example.from_dict(doc, annotations)  # Create an Example
             examples.append(example)

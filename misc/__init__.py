@@ -18,7 +18,7 @@ CREATED_BATCHES_LOGS_PATH = os.path.join(BATCH_DATA_DIR, 'logs/created-batches.c
 OPENAI_MODEL = "gpt-4o-mini"
 
 # Training
-TRAINING_EPOCHS = 20
+TRAINING_EPOCHS = 5
 BATCH_REQUESTS_SIZE = 5
 MODEL_NAME = f"./models/leganews-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
