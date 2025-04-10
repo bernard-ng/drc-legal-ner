@@ -3,7 +3,7 @@ import spacy
 from tqdm import tqdm
 from neo4j import GraphDatabase
 
-nlp = spacy.load("./models/leganews-20250403015946")
+nlp = spacy.load("./models/model-best")
 df = pd.read_csv("./dataset/data.csv")
 df.rename(columns={"date": "published_at"}, inplace=True)
 
