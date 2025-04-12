@@ -8,19 +8,27 @@ help:
 
 .PHONY: train_efficiency
 train_efficiency: ## Train the model with efficiency
-	python -m spacy train config_efficiency.cfg --output ./models/efficiency --paths.train ./dataset/spacy/train.spacy --paths.dev ./dataset/spacy/dev.spacy
+	python -m spacy train config_efficiency.cfg --output ./models/efficiency --paths.train ./dataset/spacy/train.spacy --paths.dev ./dataset/spacy/dev.spacy --gpu-id 0
 
 .PHONY: train_accuracy
 train_accuracy: ## Train the model with accuracy
-	python -m spacy train config_accuracy.cfg --output ./models/accuracy --paths.train ./dataset/spacy/train.spacy --paths.dev ./dataset/spacy/dev.spacy
+	python -m spacy train config_accuracy.cfg --output ./models/accuracy --paths.train ./dataset/spacy/train.spacy --paths.dev ./dataset/spacy/dev.spacy --gpu-id 0
 
-.PHONY: evaluate
-evaluate: ## Evaluate the model
-	python -m spacy evaluate ./models/model-best ./dataset/spacy/dev.spacy --output ./results/evaluation.json
+.PHONY: evaluate_efficiency
+evaluate_efficiency: ## Evaluate the model
+	python -m spacy evaluate ./models/efficiency/model-best ./dataset/spacy/dev.spacy --output ./results/efficiency_evaluation.json
 
-.PHONY: benchmark
-benchmark: ## Benchmark the model
-	python -m spacy benchmark accuracy ./models/model-best ./dataset/spacy/dev.spacy --output ./results/benchmark.json
+.PHONY: evaluate_accuracy
+evaluate_accuracy: ## Evaluate the model
+	python -m spacy evaluate ./models/accuracy/model-best ./dataset/spacy/dev.spacy --output ./results/accuracy_evaluation.json
+
+.PHONY: benchmark_efficiency
+benchmark_efficiency: ## Benchmark the model
+	python -m spacy benchmark accuracy ./models/efficiency/model-best ./dataset/spacy/dev.spacy --output ./results/efficiency_benchmark.json
+
+.PHONY: benchmark_accuracy
+benchmark_accuracy: ## Benchmark the model
+	python -m spacy benchmark accuracy ./models/accuracy/model-best ./dataset/spacy/dev.spacy --output ./results/accuracy_benchmark.json
 
 .PHONY: visualize
 visualize: ## Visualize NER

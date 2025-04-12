@@ -1,11 +1,9 @@
+import argparse
+
 import pandas as pd
 import spacy
 from tqdm import tqdm
 from neo4j import GraphDatabase
-
-nlp = spacy.load("./models/model-best")
-df = pd.read_csv("./dataset/data.csv")
-df.rename(columns={"date": "published_at"}, inplace=True)
 
 def extract_entities(text):
     doc = nlp(text)
@@ -22,62 +20,77 @@ def extract_entities(text):
     return ", ".join(types), ", ".join(references), ", ".join(dates)
 
 
-# Apply NER model
-df[["types", "references", "dates"]] = df["title"].apply(lambda x: pd.Series(extract_entities(str(x))))
-df.to_csv("./dataset/predictions.csv", index=False)
-
-# Neo4j connection
-driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
-
-
-def create_graph(tx, title, published_at, types, references, dates):
-    query = (
-        "MERGE (d:Document {title: $title}) "
-        "SET d.published_at = $published_at, d.types = $types, d.references = $references, d.dates = $dates"
-    )
-    tx.run(query, title=title, published_at=published_at, types=types, references=references, dates=dates)
-
-
-def create_citation(tx, citing_title, cited_title):
-    query = (
-        "MATCH (citing:Document {title: $citing_title}), (cited:Document {title: $cited_title}) "
-        "MERGE (citing)-[:CITES]->(cited)"
-    )
-    tx.run(query, citing_title=citing_title, cited_title=cited_title)
-
-
-# Create citations with improved logic
-def create_citations(tx, citing_title, cited_title):
-    query = (
-        "MATCH (citing:Document {title: $citing_title}), (cited:Document {title: $cited_title}) "
-        "MERGE (citing)-[:CITES]->(cited)"
-    )
-    tx.run(query, citing_title=citing_title, cited_title=cited_title)
-
-
-# Insert nodes
-def populate_neo4j():
+def setup_database(driver: GraphDatabase.driver) -> None:
     with driver.session() as session:
-        for _, row in tqdm(df.iterrows(), desc="Inserting nodes into Neo4j", total=len(df)):
-            session.execute_write(create_graph, row["title"], row["published_at"], row["types"], row["references"],
-                                      row["dates"])
+        session.run("CREATE CONSTRAINT unique_document_title IF NOT EXISTS FOR (d:Document) REQUIRE d.title IS UNIQUE")
+        print("🟢 Database setup completed.")
+
+
+def clean_database(driver: GraphDatabase.driver) -> None:
+    with driver.session() as session:
+        session.run("MATCH (n) SET n = {}")
+        session.run("MATCH (n) DETACH DELETE n")
+        session.run("MATCH ()-[r]->() DELETE r")
+        print("🟢 Database cleared.")
+
+
+def create_document_nodes(driver: GraphDatabase.driver, df_predictions: pd.DataFrame) -> None:
+    with driver.session() as session:
+        for _, row in tqdm(df_predictions.iterrows(), desc="Inserting nodes into Neo4j", total=len(df_predictions)):
+            query = (
+                "MERGE (d:Document {title: $title}) "
+                "SET d.published_at = $published_at, d.types = $types, d.references = $references, d.dates = $dates"
+            )
+            session.run(query, title=row["title"], published_at=row["published_at"], types=row["types"], references=row["references"], dates=row["dates"])
 
 
     with driver.session() as session:
-        for _, row in tqdm(df.iterrows(), desc="Creating citations", total=len(df)):
+        for _, row in tqdm(df_predictions.iterrows(), desc="Creating citations", total=len(df_predictions)):
             citing_title = row["title"]
-            citing_references = set(row["references"].split(", ")) if row["references"] else set()
-            citing_types = set(row["types"].split(", ")) if row["types"] else set()
+            citing_references = set(str(row["references"]).split(", ")) if pd.notna(row["references"]) else set()
+            citing_types = set(str(row["types"]).split(", ")) if pd.notna(row["types"]) else set()
 
-            for _, candidate_row in df.iterrows():
+            for _, candidate_row in df_predictions.iterrows():
                 cited_title = candidate_row["title"]
-                cited_references = set(candidate_row["references"].split(", ")) if candidate_row["references"] else set()
-                cited_types = set(candidate_row["types"].split(", ")) if candidate_row["types"] else set()
 
-                # Ensure a valid citation match
+                # Skip self-citations
+                if citing_title == cited_title:
+                    continue
+
+                cited_references = set(str(candidate_row["references"]).split(", ")) if pd.notna(
+                    candidate_row["references"]) else set()
+                cited_types = set(str(candidate_row["types"]).split(", ")) if pd.notna(
+                    candidate_row["types"]) else set()
+
                 if citing_references & cited_references and citing_types & cited_types:
-                    session.execute_write(create_citations, citing_title, cited_title)
+                    query = (
+                        "MATCH (citing:Document {title: $citing_title}), (cited:Document {title: $cited_title}) "
+                        "MERGE (citing)-[:CITES]->(cited)"
+                    )
+                    session.run(query, citing_title=citing_title, cited_title=cited_title)
 
-populate_neo4j()
-driver.close()
-print("Neo4j database updated successfully!")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Import packages into Neo4j")
+    parser.add_argument("--model", type=str, default="efficiency", help="Model name")
+    parser.add_argument("--skip-clear", action="store_true", help="Skip clearing the database")
+    parser.add_argument("--skip-predictions", action="store_true", help="Skip predictions")
+    args = parser.parse_args()
+
+    neo4j_driver = GraphDatabase.driver("bolt://localhost:7687", auth=("neo4j", "password"))
+
+    if not args.skip_clear:
+        clean_database(neo4j_driver)
+        setup_database(neo4j_driver)
+
+    if not args.skip_predictions:
+        nlp = spacy.load(f"./models/{args.model}/model-best")
+        df = pd.read_csv("./dataset/data.csv")
+        df.rename(columns={"date": "published_at"}, inplace=True)
+        df[["types", "references", "dates"]] = df["title"].apply(lambda x: pd.Series(extract_entities(str(x))))
+        df.to_csv("./dataset/predictions.csv", index=False)
+
+
+    create_document_nodes(neo4j_driver, df := pd.read_csv("./dataset/predictions.csv"))
+    neo4j_driver.close()
+    print("🟢 Documents importation completed !")
