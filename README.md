@@ -1,7 +1,27 @@
-# Towards a Congolese Legal Knowledge Graph: LLM-Enhanced NER for Citation Detection
+# Automated Citation Detection in Congolese Legal Texts: Leveraging LLM-Based NER for Knowledge Graph Construction
 
-This Named Entity Recognition (NER) model is tailored to automate the extraction of critical legal entities from Congolese legislative and regulatory documents.
-Focused on identifying three core categories—Document Type, Reference Number, and Publication Date—the model streamlines the parsing of legal texts for enhanced accessibility and analysis..*
+This paper builds upon our previous work on Juro,
+an AI-powered chatbot designed to improve legal information
+access in the Democratic Republic of Congo (DRC), by ad-
+dressing the specific challenge of automated citation detection
+in unstructured legal texts. We propose an end-to-end approach
+that combines Large Language Model (LLM)-based annotation
+and Named Entity Recognition (NER) for extracting key entities
+critical to constructing a legal knowledge graph. Over 8,400
+Congolese legal document titles were scraped and annotated via
+the GPT-4o-mini model, with subsequent training implemented
+in spaCy under two distinct configurations emphasizing accuracy
+and efficiency. We evaluated the system using both a split dataset
+and a human-annotated benchmark, demonstrating robust per-
+formance in identifying document types, reference numbers,
+and publication dates. An initial mapping algorithm connected
+documents based on annotated entities, revealing a preliminary
+citation graph of over 1,400 relationships. While the current
+methodology shows promise in automating entity extraction
+and preliminary graph construction, future developments will
+explore deeper relationship modeling, improved type coverage,
+and integration into the Juro framework to provide enhanced
+legal support.
 
 # Usage
 
